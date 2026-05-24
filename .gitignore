@@ -1,0 +1,17 @@
+# --- Secrets & Configs ---
+.env
+*.local
+secrets/
+
+# --- OS Garbage ---
+.DS_Store
+Thumbs.db
+*.tmp
+
+# --- Editor / IDE Specific ---
+.vscode/
+.idea/
+*.swp
+
+# --- Other ---
+scratch/
