@@ -2,7 +2,7 @@
 
 REPO_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SKILLS_SRC="$REPO_DIR/core/skills"
-TARGET_DIR="$HOME/.gemini/antigravity/skills"
+TARGET_DIR="$HOME/.gemini/skills"
 
 echo "🧹 unbloat-ed: Deploying skills to system environment..."
 
