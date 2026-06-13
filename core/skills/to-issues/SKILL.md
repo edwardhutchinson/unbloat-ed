@@ -7,7 +7,7 @@ description: Break a plan, spec, or PRD into independently-grabbable issues on t
 
 Break a plan into independently-grabbable issues using vertical slices (tracer bullets).
 
-Publish issues to an `.project-ed/issues/` directory in the project root. Create the directories if needed.
+Publish issues to a dedicated directory within the `project-ed/issues/` directory in the project root. Create the directories if needed.
 
 ## Process
 
