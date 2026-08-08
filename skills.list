@@ -1,0 +1,29 @@
+# Which upstream skills to install. One name per line; blank lines and
+# lines starting with # are ignored.
+#
+# Names are resolved against the pinned checkout by searching its buckets
+# (engineering, productivity, misc, in-progress, deprecated), so a skill that
+# gets promoted between buckets upstream keeps working. The bucket each one
+# lived in at the time of writing is noted below for orientation only.
+#
+# Add a skill by adding its name here and re-running install-claude.sh.
+# Run ./update-skills.sh --list to see everything available at the current pin.
+
+# --- engineering ---
+code-review
+domain-modeling
+grill-with-docs
+implement
+improve-codebase-architecture
+research
+setup-matt-pocock-skills
+tdd
+to-spec
+to-tickets
+wayfinder
+
+# --- productivity ---
+grill-me
+grilling
+handoff
+teach

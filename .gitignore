@@ -15,3 +15,6 @@ Thumbs.db
 
 # --- Other ---
 scratch/
+
+# --- Upstream skills checkout (pinned by skills.lock, never committed) ---
+.cache/
