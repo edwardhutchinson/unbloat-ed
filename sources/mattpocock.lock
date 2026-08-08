@@ -1,0 +1,20 @@
+# Matt Pocock's skills — https://github.com/mattpocock/skills
+#
+# These files are NOT vendored into this repo. This lockfile is the only record
+# of which version we use. The install scripts clone the repo into .cache/,
+# check out this exact commit, and symlink every skill matched by `skills`.
+#
+# Bump the pin with ./update-skills.sh mattpocock — don't hand-edit `commit`.
+
+url        git@github.com:mattpocock/skills.git
+commit     6acc160e4e0cd062dbbbd7a1b26ae92855edf07e
+ref        v1.2.3
+pinned_at  2026-08-08
+
+# Where skills live in that repo. Space-separated globs, relative to its root.
+# A matched directory counts as a skill only if it contains a SKILL.md, so
+# bucket READMEs and stray files are ignored automatically.
+#
+# Every bucket except `deprecated` is taken. Drop `in-progress` from this line
+# if the experimental ones get noisy.
+skills     skills/engineering/* skills/productivity/* skills/misc/* skills/in-progress/*

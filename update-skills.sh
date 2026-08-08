@@ -1,117 +1,138 @@
 #!/usr/bin/env bash
 #
-# Bump the upstream skills pin in skills.lock.
+# Bump the commit pinned in sources/<name>.lock.
 #
-#   ./update-skills.sh              move to the latest upstream release tag
-#   ./update-skills.sh v1.2.3       move to a specific tag, branch or commit
-#   ./update-skills.sh main         track the tip of main
-#   ./update-skills.sh --status     show the current pin and what's newer
-#   ./update-skills.sh --list       list every skill available at the current pin
+#   ./update-skills.sh                     move every source to its latest release
+#   ./update-skills.sh mattpocock          move one source to its latest release
+#   ./update-skills.sh mattpocock v1.2.3   move one source to a tag, branch or commit
+#   ./update-skills.sh --status            show every pin and what's newer
+#   ./update-skills.sh --list              list every skill that would be installed
 
 set -euo pipefail
 
 source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/lib/skills-lib.sh"
 
-CURRENT_COMMIT=$(lock_get commit)
-CURRENT_REF=$(lock_get ref)
-
-# Make sure the cache exists, then pull down everything so we can compare.
-# install-*.sh fetches shallowly to stay cheap, so deepen before diffing —
-# otherwise the commit log between two pins comes out truncated.
-sync_upstream >/dev/null
-echo "⬇️  Fetching upstream refs..."
-if [ -f "$CACHE_DIR/.git/shallow" ]; then
-    git -C "$CACHE_DIR" fetch --quiet --unshallow --tags origin 2>/dev/null || true
-fi
-git -C "$CACHE_DIR" fetch --quiet --tags --force origin '+refs/heads/*:refs/remotes/origin/*'
-
-# latest_tag — newest vN.N.N tag by version order
-latest_tag() {
-    git -C "$CACHE_DIR" tag --list 'v[0-9]*' --sort=-v:refname | head -1
+# fetch_refs <source> — make sure the cache has full history to compare against
+fetch_refs() {
+    local cache
+    cache=$(source_cache "$1")
+    sync_source "$1"
+    # The install path fetches shallowly to stay cheap, so deepen before diffing —
+    # otherwise the commit log between two pins comes out truncated.
+    if [ -f "$cache/.git/shallow" ]; then
+        git -C "$cache" fetch --quiet --unshallow --tags origin 2>/dev/null || true
+    fi
+    git -C "$cache" fetch --quiet --tags --force origin '+refs/heads/*:refs/remotes/origin/*'
 }
 
-case "${1:---latest}" in
+# latest_tag <source> — newest vN.N.N tag by version order
+latest_tag() {
+    git -C "$(source_cache "$1")" tag --list 'v[0-9]*' --sort=-v:refname | head -1
+}
+
+# update_one <source> [ref] — show what changes, confirm, rewrite the pin
+update_one() {
+    local name="$1" target_ref="${2:-}"
+    local cache current_commit current_ref target_commit lock reply tmp
+
+    cache=$(source_cache "$name")
+    lock="$SOURCES_DIR/$name.lock"
+    current_commit=$(source_get "$name" commit)
+    current_ref=$(source_get "$name" ref)
+
+    echo "🔎 $name"
+    fetch_refs "$name"
+
+    if [ -z "$target_ref" ]; then
+        target_ref=$(latest_tag "$name")
+        [ -n "$target_ref" ] || die "No release tags found in $name — pass a ref explicitly"
+    fi
+
+    target_commit=$(git -C "$cache" rev-parse --verify --quiet "${target_ref}^{commit}" \
+        || git -C "$cache" rev-parse --verify --quiet "origin/${target_ref}^{commit}") \
+        || die "Could not resolve '$target_ref' in $name"
+
+    if [ "$target_commit" = "$current_commit" ]; then
+        echo "  ✅ already at $target_ref ($(printf '%.12s' "$target_commit")) — nothing to do"
+        return 0
+    fi
+
+    echo "  📌 $current_ref ($(printf '%.12s' "$current_commit"))  →  $target_ref ($(printf '%.12s' "$target_commit"))"
+
+    # Diff only the paths this source actually contributes skills from. These
+    # stay as literal git pathspecs — `read -a` splits on whitespace without
+    # letting the shell glob-expand them against the current directory first.
+    local globs paths=()
+    globs=$(source_get "$name" skills)
+    IFS=' ' read -r -a paths <<< "$globs"
+
+    echo
+    echo "  ── Changed skills ──"
+    git -C "$cache" diff --stat "$current_commit" "$target_commit" -- "${paths[@]}" \
+        | sed 's/^/  /' || true
+
+    echo
+    echo "  ── Commits ──"
+    git -C "$cache" log --oneline --no-merges "$current_commit..$target_commit" \
+        -- "${paths[@]}" | head -30 | sed 's/^/  /' || true
+
+    echo
+    read -r -p "  Bump $name to $target_ref? [y/N] " reply
+    case "$reply" in
+        [yY]|[yY][eE][sS]) ;;
+        *) echo "  Aborted — $lock unchanged."; return 1 ;;
+    esac
+
+    # Rewrite the pin in place, leaving comments and layout alone.
+    tmp=$(mktemp)
+    awk -v commit="$target_commit" -v ref="$target_ref" -v today="$(date +%Y-%m-%d)" '
+        $1 == "commit"    { printf "commit     %s\n", commit; next }
+        $1 == "ref"       { printf "ref        %s\n", ref;    next }
+        $1 == "pinned_at" { printf "pinned_at  %s\n", today;  next }
+        { print }
+    ' "$lock" > "$tmp"
+    mv "$tmp" "$lock"
+
+    echo "  ✅ $lock now pins $target_ref ($(printf '%.12s' "$target_commit"))"
+}
+
+case "${1:-}" in
     --list)
-        echo "📋 Skills available at $CURRENT_REF:"
-        for bucket in "${BUCKETS[@]}"; do
-            [ -d "$CACHE_DIR/skills/$bucket" ] || continue
-            echo
-            echo "  --- $bucket ---"
-            find "$CACHE_DIR/skills/$bucket" -mindepth 1 -maxdepth 1 -type d \
-                -exec basename {} \; | sort | sed 's/^/  /'
+        for name in $(list_sources); do
+            sync_source "$name"
         done
-        exit 0
+        plan=$(mktemp)
+        build_plan "$plan" >/dev/null
+        echo "📋 Skills that would be installed ($(wc -l < "$plan" | tr -d ' ') total):"
+        awk -F'\t' '{ printf "  %-34s %s\n", $1, $3 }' "$plan"
+        rm -f "$plan"
         ;;
     --status)
-        echo "📌 Current pin: $CURRENT_REF ($(printf '%.12s' "$CURRENT_COMMIT"))"
-        newest=$(latest_tag)
-        newest_commit=$(git -C "$CACHE_DIR" rev-list -n1 "$newest")
-        if [ "$newest_commit" = "$CURRENT_COMMIT" ]; then
-            echo "✅ Already on the latest release ($newest)"
-        else
-            echo "🆕 Latest release: $newest ($(printf '%.12s' "$newest_commit"))"
-            echo "   Run ./update-skills.sh to move to it."
-        fi
-        exit 0
+        for name in $(list_sources); do
+            fetch_refs "$name"
+            current=$(source_get "$name" commit)
+            newest=$(latest_tag "$name")
+            echo "📌 $name: $(source_get "$name" ref) ($(printf '%.12s' "$current"))"
+            if [ -n "$newest" ]; then
+                newest_commit=$(git -C "$(source_cache "$name")" rev-list -n1 "$newest")
+                if [ "$newest_commit" = "$current" ]; then
+                    echo "   ✅ latest release"
+                else
+                    echo "   🆕 $newest available ($(printf '%.12s' "$newest_commit"))"
+                fi
+            fi
+        done
         ;;
-    --latest)
-        TARGET_REF=$(latest_tag)
-        [ -n "$TARGET_REF" ] || die "No release tags found upstream"
+    "")
+        for name in $(list_sources); do
+            update_one "$name" || true
+        done
+        echo
+        echo "Re-run ./install-claude.sh to deploy, then commit sources/."
         ;;
     *)
-        TARGET_REF="$1"
+        update_one "$1" "${2:-}"
+        echo
+        echo "Re-run ./install-claude.sh to deploy, then commit sources/."
         ;;
 esac
-
-TARGET_COMMIT=$(git -C "$CACHE_DIR" rev-parse --verify --quiet "${TARGET_REF}^{commit}" \
-    || git -C "$CACHE_DIR" rev-parse --verify --quiet "origin/${TARGET_REF}^{commit}") \
-    || die "Could not resolve '$TARGET_REF' upstream"
-
-if [ "$TARGET_COMMIT" = "$CURRENT_COMMIT" ]; then
-    echo "✅ Already pinned to $TARGET_REF ($(printf '%.12s' "$TARGET_COMMIT")) — nothing to do."
-    exit 0
-fi
-
-echo
-echo "📌 $CURRENT_REF ($(printf '%.12s' "$CURRENT_COMMIT"))  →  $TARGET_REF ($(printf '%.12s' "$TARGET_COMMIT"))"
-
-# Show the diff, but only for the skills we actually install.
-paths=()
-while IFS= read -r name; do
-    for bucket in "${BUCKETS[@]}"; do
-        paths+=("skills/$bucket/$name")
-    done
-done < <(selected_skills)
-
-echo
-echo "── Changes to your selected skills ──"
-if ! git -C "$CACHE_DIR" diff --stat "$CURRENT_COMMIT" "$TARGET_COMMIT" -- "${paths[@]}" 2>/dev/null | grep -q .; then
-    echo "  (none — the skills you install are unchanged)"
-else
-    git -C "$CACHE_DIR" diff --stat "$CURRENT_COMMIT" "$TARGET_COMMIT" -- "${paths[@]}" | sed 's/^/  /'
-fi
-
-echo
-echo "── Commits ──"
-git -C "$CACHE_DIR" log --oneline --no-merges "$CURRENT_COMMIT..$TARGET_COMMIT" \
-    | head -30 | sed 's/^/  /' || true
-
-echo
-read -r -p "Bump the pin to $TARGET_REF? [y/N] " reply
-case "$reply" in
-    [yY]|[yY][eE][sS]) ;;
-    *) echo "Aborted — skills.lock unchanged."; exit 1 ;;
-esac
-
-# Rewrite the pin in place, leaving the file's comments and layout alone.
-tmp=$(mktemp)
-awk -v commit="$TARGET_COMMIT" -v ref="$TARGET_REF" -v today="$(date +%Y-%m-%d)" '
-    $1 == "commit"    { printf "commit     %s\n", commit; next }
-    $1 == "ref"       { printf "ref        %s\n", ref;    next }
-    $1 == "pinned_at" { printf "pinned_at  %s\n", today;  next }
-    { print }
-' "$LOCK_FILE" > "$tmp"
-mv "$tmp" "$LOCK_FILE"
-
-echo "✅ skills.lock now pins $TARGET_REF ($(printf '%.12s' "$TARGET_COMMIT"))"
-echo "   Re-run ./install-claude.sh to deploy, then commit skills.lock."
