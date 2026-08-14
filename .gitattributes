@@ -1,0 +1,2 @@
+# Keep LF in the working tree regardless of a contributor's core.autocrlf
+* text=auto eol=lf
