@@ -20,6 +20,7 @@ tracked here, never his files.
 ```bash
 ./install-claude.sh    # → ~/.claude/skills
 ./install-agy.sh       # → ~/.gemini/skills
+./install-codex.sh     # → ~/.codex/skills (or $CODEX_HOME/skills)
 ```
 
 Each script clones every source at its pinned commit and symlinks all the skills
@@ -80,4 +81,4 @@ lockfile's comments alone. Re-run the install script afterwards and commit `sour
 - `/core/prompts` — strict prompts
 - `/guides` — setup notes
 - `/lib` — shared shell helpers
-- `install-claude.sh`, `install-agy.sh`, `update-skills.sh`
+- `install-claude.sh`, `install-agy.sh`, `install-codex.sh`, `update-skills.sh`

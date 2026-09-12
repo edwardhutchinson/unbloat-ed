@@ -8,7 +8,7 @@ Add one by creating a directory here with a `SKILL.md` inside:
 core/skills/my-skill/SKILL.md
 ```
 
-Then re-run `./install-claude.sh`. A directory without a `SKILL.md` is ignored, so
+Then re-run your tool’s installer, such as `./install-codex.sh`. A directory without a `SKILL.md` is ignored, so
 this README doesn't get deployed.
 
 These are deployed **last**, so a skill here overrides an upstream skill of the same

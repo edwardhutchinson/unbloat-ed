@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Shared helpers for unbloat-ed skill deployment.
-# Sourced by install-claude.sh, install-agy.sh and update-skills.sh.
+# Sourced by install-claude.sh, install-agy.sh, install-codex.sh and update-skills.sh.
 #
 # Skills come from two kinds of place:
 #
