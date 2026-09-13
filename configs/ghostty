@@ -1,5 +1,5 @@
 # --- Theme & Appearance ---
-theme = Dracula+
+theme = One Half Light
 
 # --- Font & Text Rendering ---
 font-family = "JetBrains Mono"
