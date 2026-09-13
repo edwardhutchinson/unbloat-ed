@@ -1,0 +1,15 @@
+onboarding = false
+
+[theme]
+name = "tokyo-night"
+auto_switch = false
+
+[keys]
+# Standard tmux prefix
+prefix = "ctrl+b"
+
+split_vertical = "prefix+%"
+split_horizontal = "prefix+\""
+
+detach = "prefix+d"
+
